@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<!--
+════════════════════════════════════════════════════════════════════════
+  ModelosTO·AI  ·  VARIANTE Terapia Ocupacional  ·  fork de plantilla-base.html
+  Aplica modelos/marcos de referencia de TO a un caso:
+  MOHO · CMOP-E · OTPF (AOTA) · KAWA · PEOP.
+  · Mapea el caso sobre los componentes del modelo.
+  · Justifica la elección; propone perfil ocupacional, objetivos e intervención.
+  · Compara dos modelos sobre el mismo caso (cómo cambia el foco).
+  Reutiliza kernel: openai/agente · dlWord/dlPDF · banner/busy · saveState.
+════════════════════════════════════════════════════════════════════════
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ModelosTO·AI · Marcos de referencia en Terapia Ocupacional</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+  :root{
+    --paper:#EAF0EF; --card:#FFFFFF; --ink:#16292E; --muted:#5C7076;
+    --petrol:#0E4B54; --petrol-deep:#0A363D; --petrol-soft:#E3EDEC;
+    --line:#CEDAD8; --amber:#D98A00; --green:#1E9E8A; --coral:#D9573F;
+    --radius:14px; --shadow:0 1px 2px rgba(10,54,61,.06),0 8px 24px rgba(10,54,61,.06);
+  }
+  *{box-sizing:border-box} html,body{margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--paper);line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,h4{font-family:'Libre Franklin',sans-serif;margin:0;letter-spacing:-.01em}
+  .mono{font-family:'JetBrains Mono',monospace}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  input,select,textarea{font-family:inherit;font-size:14px}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  header{background:var(--petrol-deep);color:#EAF0EF;position:sticky;top:0;z-index:20;border-bottom:1px solid #0a2a30}
+  .bar{max-width:1180px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand .logo{font-family:'Libre Franklin';font-weight:800;font-size:19px;letter-spacing:-.02em;color:#fff}
+  .brand .logo b{color:var(--amber)}
+  .brand .tag{font-size:11px;color:#8FB3B2;letter-spacing:.14em;text-transform:uppercase}
+
+  main{max-width:1180px;margin:0 auto;padding:22px 20px 60px;display:grid;grid-template-columns:1fr 300px;gap:22px}
+  @media(max-width:900px){main{grid-template-columns:1fr;padding:16px}}
+  .col-side{display:flex;flex-direction:column;gap:16px}
+  @media(max-width:900px){.col-side{order:-1}}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:22px}
+  .panel:last-child{margin-bottom:0}
+  .panel-h{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .panel-h h3{font-size:14px;font-weight:700}
+  .panel-h .eyebrow{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .panel-b{padding:18px}
+
+  .field{margin-bottom:14px}.field:last-child{margin-bottom:0}
+  label.lab{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:6px}
+  .inp{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#FBFCFC;color:var(--ink)}
+  .inp:focus{outline:2px solid var(--petrol);outline-offset:-1px;border-color:var(--petrol)}
+  textarea.inp{resize:vertical}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:520px){.row2{grid-template-columns:1fr}}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border-radius:10px;font-weight:600;font-size:14px;transition:.15s}
+  .btn-primary{background:var(--petrol);color:#fff}.btn-primary:hover{background:var(--petrol-deep)}
+  .btn-primary:disabled{background:#9DB4B3;cursor:not-allowed}
+  .btn-amber{background:var(--amber);color:#2b1c00}.btn-amber:hover{filter:brightness(.95)}
+  .btn-ghost{background:var(--petrol-soft);color:var(--petrol)}.btn-ghost:hover{background:#d3e3e1}
+  .btn-line{border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:500;font-size:13px;padding:9px 12px}
+  .btn-line:hover{border-color:var(--petrol);color:var(--petrol)}
+  .btn-block{width:100%} .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+
+  .banner{border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:14px;display:none}
+  .banner.err{background:#FBE7E2;border:1px solid #E7B4A8;color:#9a2f1a}
+  .banner.info{background:#FFF3D6;border:1px solid #F0D89A;color:#5c4600}
+  .banner.ok{background:#DFF1ED;border:1px solid #A9D8CF;color:#0e6a5c}
+  .spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .foot{max-width:1180px;margin:0 auto;padding:8px 20px 40px;color:var(--muted);font-size:12px}
+  .foot code{font-family:'JetBrains Mono';font-size:11px}
+
+  .rec{background:var(--petrol-soft);border:1px solid #bcd6d3;border-radius:12px;padding:14px 16px;margin-bottom:16px}
+  .rec h4{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--petrol);margin-bottom:6px}
+  .rec .mod{font-family:'Libre Franklin';font-weight:800;font-size:20px;margin-bottom:4px}
+  .rec .alt{font-size:13px;color:var(--muted);margin-top:8px}
+
+  .modelcard{border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+  .modelcard .mh{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .modelcard .mh .nm{font-family:'Libre Franklin';font-weight:800;font-size:18px}
+  .modelcard .mh .ds{font-size:12px;color:var(--muted)}
+  .comp{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #EEF2F1}
+  .comp .dot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:6px;background:var(--green)}
+  .comp.alt .dot{background:var(--coral)}
+  .comp .ck{font-weight:600;font-size:13.5px}
+  .comp.alt .ck{color:var(--coral)}
+  .comp .cc{font-size:13.5px;color:var(--muted);margin-top:2px}
+  .sub{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);font-weight:700;margin:14px 0 7px}
+  .modelcard ul{margin:0;padding-left:18px;font-size:14px}.modelcard li{margin-bottom:4px}
+  .just{font-size:13.5px;color:var(--muted);background:#F6F9F8;border-radius:9px;padding:10px 12px;margin-top:12px}
+  .just b{color:var(--petrol)}
+  .diff{border-left:3px solid var(--amber);padding-left:12px;margin:10px 0;font-size:13.5px;color:var(--muted)}
+
+  .ref .m{font-size:12.5px;color:var(--muted);margin-bottom:7px}.ref .m b{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <div class="brand"><span class="logo">Modelos<b>TO</b>·AI</span><span class="tag">Marcos de referencia · TO</span></div>
+  </div>
+</header>
+
+<main>
+  <div class="col-main">
+    <section class="panel">
+      <div class="panel-h"><span class="eyebrow">Caso</span><h3>Caso y modelo</h3></div>
+      <div class="panel-b">
+        <div id="banner" class="banner"></div>
+
+        <div class="field">
+          <label class="lab">Caso ocupacional</label>
+          <textarea class="inp" id="caso" rows="6" placeholder="Describe el caso: persona, diagnóstico/situación, ocupaciones afectadas, entorno, objetivos del cliente…"></textarea>
+          <div class="hint" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="inp" id="areaCaso" style="width:auto;padding:5px 8px;font-size:12px">
+              <option value="Neurología del adulto">Neurología del adulto</option>
+              <option value="Salud mental">Salud mental</option>
+              <option value="Geriatría">Geriatría</option>
+              <option value="Pediatría / integración sensorial">Pediatría</option>
+              <option value="Rehabilitación de la mano">Rehabilitación de la mano</option>
+              <option value="Daño cerebral adquirido">Daño cerebral adquirido</option>
+            </select>
+            <button class="btn btn-line" id="genCaso" style="padding:5px 10px;font-size:12px">Generar caso de ejemplo</button>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div class="field"><label class="lab">Modelo / marco</label>
+            <select class="inp" id="modelo">
+              <option value="ia">Que la IA recomiende</option>
+              <option value="MOHO">MOHO (Modelo de la Ocupación Humana)</option>
+              <option value="CMOP-E">CMOP-E (canadiense)</option>
+              <option value="OTPF">OTPF (AOTA)</option>
+              <option value="KAWA">KAWA (modelo del río)</option>
+              <option value="PEOP">PEOP (Persona-Entorno-Ocupación)</option>
+            </select></div>
+          <div class="field"><label class="lab">Nivel</label>
+            <select class="inp" id="nivel"><option value="grado" selected>Grado</option><option value="avanzado">Avanzado / clínico</option></select></div>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="aplicarBtn">Aplicar modelo al caso</button>
+
+        <details style="margin-top:12px"><summary style="font-size:12px;color:var(--muted);cursor:pointer;font-weight:600">Ajustes avanzados (API)</summary>
+          <div class="row2" style="margin-top:12px">
+            <div class="field"><label class="lab">OpenAI API Key</label><input class="inp" id="apiKey" type="password" placeholder="sk-…" autocomplete="off"><div class="hint">Solo en tu navegador. Compartida entre las apps.</div></div>
+            <div class="field"><label class="lab">Modelo</label><select class="inp" id="model"><option value="gpt-4o-mini" selected>gpt-4o-mini</option><option value="gpt-4o">gpt-4o</option><option value="gpt-4.1-mini">gpt-4.1-mini</option></select></div>
+          </div></details>
+      </div>
+    </section>
+
+    <section class="panel" id="outPanel" style="display:none">
+      <div class="panel-h"><span class="eyebrow">Aplicación</span><h3 id="outTitle">Modelo aplicado</h3></div>
+      <div class="panel-b" id="outBody"></div>
+    </section>
+  </div>
+
+  <div class="col-side">
+    <div class="panel">
+      <div class="panel-h"><span class="eyebrow">Modelos</span><h3>Referencia rápida</h3></div>
+      <div class="panel-b ref" id="refBox" style="font-size:12.5px"></div>
+    </div>
+  </div>
+</main>
+
+<div class="foot">ModelosTO·AI — variante del portfolio · herramienta formativa · <code>vanilla HTML/JS · OpenAI · docx.js · jsPDF</code></div>
+
+<script>
+/* ═══ KERNEL ═══ */
+const $=s=>document.querySelector(s);
+const el=(t,c)=>{const e=document.createElement(t);if(c)e.className=c;return e;};
+const APP={id:'modelosto',version:1};
+const K_KEY='ia_openai_key',K_MODEL='ia_openai_model',K_STATE=APP.id+':state';
+function loadCfg(){ $('#apiKey').value=localStorage.getItem(K_KEY)||''; const m=localStorage.getItem(K_MODEL); if(m)$('#model').value=m; }
+function saveCfg(){ localStorage.setItem(K_KEY,$('#apiKey').value.trim()); localStorage.setItem(K_MODEL,$('#model').value); }
+async function openai(messages,{json=false,temperature=0.6}={}){
+  const key=$('#apiKey').value.trim(); if(!key) throw new Error('NO_KEY');
+  const body={model:$('#model').value,messages,temperature}; if(json) body.response_format={type:'json_object'};
+  const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(body)});
+  if(!r.ok){ const t=await r.text(); if(r.status===401) throw new Error('BAD_KEY'); throw new Error('API '+r.status+': '+t.slice(0,180)); }
+  return (await r.json()).choices[0].message.content;
+}
+async function agente(system,user,{json=false,temperature=0.6}={}){ const out=await openai([{role:'system',content:system},{role:'user',content:String(user)}],{json,temperature}); return json?JSON.parse(out):out; }
+function banner(msg,type='info'){ const b=$('#banner'); b.className='banner '+type; b.textContent=msg; b.style.display=msg?'block':'none'; }
+function busy(btn,on,label){ if(on){ btn.dataset.old=btn.innerHTML; btn.disabled=true; btn.innerHTML='<span class="spin"></span> '+(label||'…'); } else { btn.disabled=false; btn.innerHTML=btn.dataset.old||btn.innerHTML; } }
+function handleErr(e){ console.error(e);
+  if(e.message==='NO_KEY') banner('Introduce tu OpenAI API Key en «Ajustes avanzados (API)».','err');
+  else if(e.message==='BAD_KEY') banner('API Key no válida (401).','err');
+  else if(e instanceof SyntaxError) banner('Formato inesperado del modelo. Reintenta.','err');
+  else banner('⚠ '+e.message,'err'); }
+function saveState(o){ try{ localStorage.setItem(K_STATE,JSON.stringify({v:APP.version,data:o})); }catch(e){} }
+function loadState(){ try{ const s=JSON.parse(localStorage.getItem(K_STATE)); if(s&&s.v===APP.version) return s.data; localStorage.removeItem(K_STATE);}catch(e){} return null; }
+async function dlWord(filename,blocks){
+  const {Document,Packer,Paragraph,TextRun,HeadingLevel}=docx;
+  const P=(t,o={})=>new Paragraph({children:[new TextRun({text:String(t),...o})],spacing:{after:120}}); const ch=[];
+  blocks.forEach(b=>{ if(b.h1)ch.push(new Paragraph({text:b.h1,heading:HeadingLevel.HEADING_1}));
+    else if(b.h2)ch.push(new Paragraph({text:b.h2,heading:HeadingLevel.HEADING_2}));
+    else if(b.h3)ch.push(new Paragraph({text:b.h3,heading:HeadingLevel.HEADING_3}));
+    else if(b.p!==undefined)ch.push(P(b.p,b.opts||{}));
+    else if(b.bullets)b.bullets.forEach(x=>ch.push(new Paragraph({text:String(x),bullet:{level:0}})));
+    else if(b.kv)b.kv.forEach(([k,v])=>ch.push(new Paragraph({children:[new TextRun({text:k+': ',bold:true}),new TextRun({text:String(v)})],spacing:{after:80}})));
+    else if(b.spacer)ch.push(P('')); });
+  saveAs(await Packer.toBlob(new Document({sections:[{children:ch}]})),filename.endsWith('.docx')?filename:filename+'.docx');
+}
+function dlPDF(filename,blocks){
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'pt',format:'a4'}); const W=595,M=48; let y=56; const ink=[22,41,46],petrol=[14,75,84],muted=[92,112,118];
+  const line=(txt,size,style,color,gap)=>{ doc.setFont('helvetica',style||'normal'); doc.setFontSize(size||11); doc.setTextColor(...(color||ink));
+    doc.splitTextToSize(String(txt),W-M*2).forEach(l=>{ if(y>800){doc.addPage();y=56;} doc.text(l,M,y); y+=(size||11)*1.35; }); if(gap)y+=gap; };
+  doc.setFillColor(14,75,84); doc.rect(0,0,W,30,'F');
+  blocks.forEach(b=>{ if(b.h1)line(b.h1,17,'bold',petrol,4); else if(b.h2)line(b.h2,14,'bold',petrol,3); else if(b.h3)line(b.h3,12,'bold',ink,2);
+    else if(b.p!==undefined)line(b.p,11,'normal',ink,2); else if(b.bullets)b.bullets.forEach(x=>line('•  '+x,11,'normal',muted,1));
+    else if(b.kv)b.kv.forEach(([k,v])=>line(k+': '+v,11,'normal',ink,1)); else if(b.spacer)y+=8; });
+  doc.save(filename.endsWith('.pdf')?filename:filename+'.pdf');
+}
+
+/* ═══ APP ═══ */
+const MODELS={
+ "MOHO":{ds:"Modelo de la Ocupación Humana (Kielhofner)",comp:["Volición (valores, intereses, causalidad personal)","Habituación (hábitos y roles)","Capacidad de desempeño (objetiva y subjetiva/vivida)","Entorno (físico y social)"]},
+ "CMOP-E":{ds:"Modelo Canadiense del Desempeño y la Implicación Ocupacional",comp:["Persona (afectivo, cognitivo, físico; espiritualidad en el núcleo)","Ocupación (autocuidado, productividad, ocio)","Entorno (físico, social, cultural, institucional)","Desempeño e implicación ocupacional"]},
+ "OTPF":{ds:"Marco de Trabajo de la AOTA (dominio y proceso)",comp:["Ocupaciones (AVD, AIVD, descanso/sueño, educación, trabajo, juego, ocio, participación social)","Factores del cliente (valores/creencias, funciones y estructuras corporales)","Habilidades de desempeño (motoras, de procesamiento, de interacción social)","Patrones de desempeño (hábitos, rutinas, roles, rituales)","Contextos y entornos"]},
+ "KAWA":{ds:"Modelo del río (metáfora del flujo vital)",comp:["Mizu / Agua (flujo vital, salud y bienestar)","Iwa / Rocas (problemas y circunstancias que obstruyen)","Paredes y lecho del río (entorno físico y social)","Sukima / Espacios (oportunidades donde interviene la TO)"]},
+ "PEOP":{ds:"Persona–Entorno–Ocupación–(Desempeño)",comp:["Persona (capacidades y factores intrínsecos)","Entorno (factores extrínsecos)","Ocupación (actividades y tareas significativas)","Desempeño / participación ocupacional (ajuste P-E-O)"]}
+};
+let LAST=null; // {caso, modelo, ap, rec}
+
+/* ── AGENTE · Generar caso ── */
+async function generarCaso(){
+  const area=$('#areaCaso').value;
+  const sys=`Eres terapeuta ocupacional docente. Crea un caso ocupacional realista y breve del área de ${area} para trabajar modelos y marcos de referencia de TO.
+Devuelve SOLO JSON: {"caso":"6-10 frases: persona (edad, situación), diagnóstico/contexto, ocupaciones significativas afectadas, desempeño, entorno físico y social, y objetivos/deseos del cliente"}`;
+  const r=await agente(sys,'Genera el caso.',{json:true,temperature:0.9}); return r.caso;
+}
+
+/* ── AGENTE · Recomendar modelo ── */
+async function recomendar(caso){
+  const opciones=Object.keys(MODELS).map(k=>`${k}: ${MODELS[k].ds}`).join('; ');
+  const sys=`Eres terapeuta ocupacional docente. Ante el caso, recomienda el modelo/marco de práctica de TO más adecuado entre: ${opciones}.
+Devuelve SOLO JSON: {"recomendado":"MOHO|CMOP-E|OTPF|KAWA|PEOP","justificacion":"por qué encaja con el caso","alternativas":[{"modelo":"…","porque":"…"}]}`;
+  return await agente(sys, caso, {json:true, temperature:0.4});
+}
+
+/* ── AGENTE · Aplicar modelo ── */
+async function aplicarModelo(caso, modelo, compararCon){
+  const M=MODELS[modelo];
+  const sys=`Eres terapeuta ocupacional experto. Aplica el modelo ${modelo} (${M.ds}) al caso.
+Mapea el caso sobre estos componentes EXACTOS y en este orden:
+${M.comp.map((c,i)=>`${i+1}. ${c}`).join('\n')}
+Devuelve SOLO JSON:
+{"componentes":[{"clave":"nombre corto del componente","contenido":"qué aporta el caso sobre ese componente","alterado":true|false}],
+ "perfil_ocupacional":"síntesis del perfil ocupacional del cliente",
+ "objetivos":["objetivo SMART centrado en la persona","…"],
+ "intervencion":["propuesta de intervención alineada con el modelo","…"],
+ "marco_referencia":"marco(s) de referencia complementario(s) sugerido(s) y por qué (p. ej. biomecánico, integración sensorial, cognitivo-conductual…)",
+ "justificacion":"por qué ${modelo} es adecuado para este caso"${compararCon?`,\n "diferencia_enfoque":"en qué cambia el foco respecto al modelo ${compararCon}"`:''}}
+"clave" debe ser una etiqueta breve de cada componente listado, en el mismo orden. Rigor en terminología de TO.`;
+  return await agente(sys, caso, {json:true, temperature:0.5});
+}
+
+/* ── Flujo ── */
+async function aplicar(){
+  banner(''); const caso=$('#caso').value.trim(); if(!caso){ banner('Describe el caso o genera uno de ejemplo.','info'); return; }
+  const sel=$('#modelo').value; const btn=$('#aplicarBtn'); busy(btn,true,'Aplicando…');
+  $('#outBody').innerHTML=''; $('#outPanel').style.display='block'; $('#outPanel').scrollIntoView({behavior:'smooth',block:'nearest'});
+  try{
+    let modelo=sel, rec=null;
+    if(sel==='ia'){ busy(btn,true,'Recomendando…'); rec=await recomendar(caso); modelo=rec.recomendado||'MOHO'; }
+    busy(btn,true,'Aplicando '+modelo+'…');
+    const ap=await aplicarModelo(caso, modelo);
+    LAST={caso,modelo,ap,rec,segundo:null};
+    render(); saveState(LAST);
+  }catch(e){ handleErr(e); } finally{ busy(btn,false); }
+}
+
+async function comparar(){
+  if(!LAST){ return; } const otro=$('#cmpSel').value; if(!otro||otro===LAST.modelo){ banner('Elige un modelo distinto para comparar.','info'); return; }
+  const btn=$('#cmpBtn'); busy(btn,true,'Comparando…');
+  try{ const ap2=await aplicarModelo(LAST.caso, otro, LAST.modelo); LAST.segundo={modelo:otro,ap:ap2}; render(); saveState(LAST); }
+  catch(e){ handleErr(e); } finally{ busy(btn,false); }
+}
+
+/* ── Render ── */
+function render(){
+  const b=$('#outBody'); b.innerHTML=''; const {modelo,ap,rec,segundo}=LAST;
+  $('#outTitle').textContent='Modelo aplicado · '+modelo;
+  if(rec){ const d=el('div','rec');
+    d.innerHTML=`<h4>Recomendación de la IA</h4><div class="mod">${rec.recomendado}</div><div>${rec.justificacion||''}</div>`+
+      (rec.alternativas&&rec.alternativas.length?`<div class="alt"><b>Alternativas:</b> ${rec.alternativas.map(a=>`${a.modelo} (${a.porque})`).join(' · ')}</div>`:'');
+    b.appendChild(d); }
+  b.appendChild(modelCard(modelo,ap));
+  // comparador
+  const cmp=el('div'); cmp.style.cssText='margin:8px 0 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+  const opts=Object.keys(MODELS).filter(k=>k!==modelo).map(k=>`<option value="${k}">${k}</option>`).join('');
+  cmp.innerHTML=`<span style="font-size:13px;color:var(--muted)">Comparar con otro modelo:</span>
+    <select class="inp" id="cmpSel" style="width:auto;padding:7px 10px">${opts}</select>
+    <button class="btn btn-line" id="cmpBtn">Comparar</button>`;
+  b.appendChild(cmp);
+  if(segundo){ if(segundo.ap.diferencia_enfoque){ const df=el('div','diff'); df.innerHTML=`<b>Cambio de foco (${segundo.modelo} vs ${modelo}):</b> ${segundo.ap.diferencia_enfoque}`; b.appendChild(df); }
+    b.appendChild(modelCard(segundo.modelo,segundo.ap)); }
+  // export
+  const tb=el('div','toolbar'); tb.innerHTML='<button class="btn btn-primary" id="dlW">⬇ Word</button><button class="btn btn-ghost" id="dlP">⬇ PDF</button>';
+  b.appendChild(tb);
+  $('#cmpBtn').onclick=comparar; $('#dlW').onclick=()=>dlWord('modelo_to',blocks()); $('#dlP').onclick=()=>dlPDF('modelo_to',blocks());
+}
+function modelCard(modelo,ap){ const M=MODELS[modelo]; const c=el('div','modelcard');
+  let h=`<div class="mh"><span class="nm">${modelo}</span><span class="ds">${M.ds}</span></div>`;
+  h+=`<div class="sub">Componentes del modelo aplicados al caso</div>`;
+  (ap.componentes||[]).forEach(co=>{ h+=`<div class="comp ${co.alterado?'alt':''}"><span class="dot"></span><div><div class="ck">${co.clave}</div><div class="cc">${co.contenido||''}</div></div></div>`; });
+  if(ap.perfil_ocupacional){ h+=`<div class="sub">Perfil ocupacional</div><p style="margin:0;font-size:14px">${ap.perfil_ocupacional}</p>`; }
+  if(ap.objetivos&&ap.objetivos.length){ h+=`<div class="sub">Objetivos</div><ul>${ap.objetivos.map(x=>`<li>${x}</li>`).join('')}</ul>`; }
+  if(ap.intervencion&&ap.intervencion.length){ h+=`<div class="sub">Intervención alineada con el modelo</div><ul>${ap.intervencion.map(x=>`<li>${x}</li>`).join('')}</ul>`; }
+  if(ap.marco_referencia){ h+=`<div class="sub">Marco(s) de referencia</div><p style="margin:0;font-size:14px">${ap.marco_referencia}</p>`; }
+  if(ap.justificacion){ h+=`<div class="just"><b>Por qué ${modelo}:</b> ${ap.justificacion}</div>`; }
+  c.innerHTML=h; return c;
+}
+
+function blocks(){ const {caso,modelo,ap,segundo,rec}=LAST;
+  const b=[{h1:'Aplicación de modelo de TO'},{kv:[['Modelo',modelo+' — '+MODELS[modelo].ds]]}];
+  if(rec) b.push({p:'Recomendación IA: '+rec.recomendado+'. '+(rec.justificacion||'')});
+  b.push({h3:'Caso'},{p:caso},{spacer:true});
+  const addModel=(mo,a)=>{ b.push({h2:mo+' — '+MODELS[mo].ds});
+    b.push({h3:'Componentes'}); (a.componentes||[]).forEach(co=>b.push({p:`${co.clave}${co.alterado?' (alterado)':''}: ${co.contenido||''}`}));
+    if(a.perfil_ocupacional){b.push({h3:'Perfil ocupacional'});b.push({p:a.perfil_ocupacional});}
+    if(a.objetivos){b.push({h3:'Objetivos'});b.push({bullets:a.objetivos});}
+    if(a.intervencion){b.push({h3:'Intervención'});b.push({bullets:a.intervencion});}
+    if(a.marco_referencia){b.push({h3:'Marco de referencia'});b.push({p:a.marco_referencia});}
+    if(a.justificacion){b.push({h3:'Justificación'});b.push({p:a.justificacion});} b.push({spacer:true}); };
+  addModel(modelo,ap);
+  if(segundo){ if(segundo.ap.diferencia_enfoque)b.push({p:'Cambio de foco: '+segundo.ap.diferencia_enfoque}); addModel(segundo.modelo,segundo.ap); }
+  return b;
+}
+
+/* ── Referencia lateral ── */
+function renderRef(){ $('#refBox').innerHTML=Object.entries(MODELS).map(([k,v])=>`<div class="m"><b>${k}</b> — ${v.ds}</div>`).join('')
+  +`<div class="m" style="margin-top:8px;font-size:11.5px">Cada modelo ofrece una lente distinta: elige según las ocupaciones afectadas, el entorno y los objetivos del cliente.</div>`; }
+
+/* ── INIT ── */
+window.addEventListener('DOMContentLoaded',()=>{
+  loadCfg(); renderRef();
+  $('#apiKey').addEventListener('change',saveCfg); $('#model').addEventListener('change',saveCfg);
+  $('#aplicarBtn').onclick=aplicar;
+  $('#genCaso').onclick=async()=>{ const b=$('#genCaso'); busy(b,true,'Generando…'); try{ $('#caso').value=await generarCaso(); }catch(e){ handleErr(e); } finally{ busy(b,false); } };
+  const prev=loadState(); if(prev&&prev.ap){ LAST=prev; $('#caso').value=prev.caso||''; if(prev.modelo&&$('#modelo').querySelector(`option[value="${prev.modelo}"]`))$('#modelo').value=prev.modelo; $('#outPanel').style.display='block'; render(); }
+});
+</script>
+</body>
+</html>
